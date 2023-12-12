@@ -156,42 +156,6 @@ def part1(patterns: List[Pattern]): Unit = {
     println()
 }
 
-def matchesAgainst(raw: String, str: String): Boolean = {
-    val zipped = str.zip(raw)
-    zipped.forall { case (c, r) => (r == QUERY) || c == r }
-}
-
-def combosFromValid(left: List[Int], len: Int, validate: String): List[String] = {
-
-    if (left.isEmpty) {
-        List("")
-    } else {
-        val v = "#" * left.head
-        val rest = left.tail
-
-        val tail = if (rest.length == 0) "" else "."
-        val remainderLen = (rest.sum + rest.length - 1)
-        val maxLen = if (remainderLen > 0) len - remainderLen else len    // leave room for remainder
-        val dotLen = maxLen - v.length - tail.length
-
-        (for {
-            i <- 0 to dotLen
-            prefix = "." * i
-            j <- 0 to dotLen - i
-            suffix = "." * j
-            combo = prefix + v + suffix + tail
-            comboLen = combo.length
-            if matchesAgainst(validate, combo)
-            restCombo <- combosFromValid(rest, len - comboLen, validate.substring(comboLen))
-            combined = combo + restCombo
-            if (combined.length == len)
-        } yield {
-            combined
-        }).toList.distinct
-    }
-}
-
-
 def part2(patterns: List[Pattern]): Unit = {
 
     val MULTIPLIER = 5
