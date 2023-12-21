@@ -248,12 +248,12 @@ def part1(heatMap: HeatMap): Unit = {
 
     println("Part 1")
 
-    val p = aStar(Visit(heatMap.pointAt(0,0), Right, 1), heatMap.pointAt(heatMap.maxX, heatMap.maxY), false)
+    val p = aStar(Visit(heatMap.pointAt(0,0), Right, 0), heatMap.pointAt(heatMap.maxX, heatMap.maxY), false)
     println(p)
 
     if (p.isDefined) {
         println(p.get.render(heatMap))
-        val cost = p.get.value
+        val cost = p.get.value + heatMap.pointAt(heatMap.maxX, heatMap.maxY).value
         println(s"Cost: $cost")
     }
 
@@ -263,12 +263,12 @@ def part2(heatMap: HeatMap): Unit = {
 
     println("Part 2")
 
-    val p = aStar(Visit(heatMap.pointAt(0,0), Right, 1), heatMap.pointAt(heatMap.maxX, heatMap.maxY), true)
+    val p = aStar(Visit(heatMap.pointAt(0,0), Right, 0), heatMap.pointAt(heatMap.maxX, heatMap.maxY), true)
     println(p)
 
     if (p.isDefined) {
         println(p.get.render(heatMap))
-        val cost = p.get.value
+        val cost = p.get.value + heatMap.pointAt(heatMap.maxX, heatMap.maxY).value
         println(s"Cost: $cost")
     }
 }
@@ -292,4 +292,4 @@ println("End time: " + endTime)
 println("Elapsed time: " + java.time.Duration.between(startTime, endTime))
 
 // Part 1: Your puzzle answer was 956.
-// Part 2: NOT 1111 NOT 1113
+// Part 2: 1106
