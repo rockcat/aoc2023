@@ -1,0 +1,7 @@
+broadcaster -> a
+
+&a -> b, c
+
+%b -> a
+
+&c -> output, a

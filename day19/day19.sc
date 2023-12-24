@@ -88,8 +88,30 @@ object XmasRange {
     def empty: XmasRange = XmasRange(Map.empty[String, Range])
 }
 
-case class Condition(field: String, test: Test, goto: Label){
-    override def toString(): String = field + test.toString + ":" + goto.toString
+case class XmasSequences(valid: Map[String, IndexedSeq[Int]]) {
+    override def toString(): String = {
+        "XmasSequences(" + valid.keys.toList.sorted.map(key => key + ": " + valid(key).size).mkString(", ") + " => " + combinations +")"
+    }
+
+    def combinations: BigInt = valid.values.map(_.size).map(BigInt(_)).product
+}
+
+object XmasSequences {
+    def FULL_SEQ = Range(1,4001).toIndexedSeq
+    def full = XmasSequences(
+        Map(
+            "x" -> FULL_SEQ,
+            "m" -> FULL_SEQ, 
+            "a" -> FULL_SEQ, 
+            "s" -> FULL_SEQ
+        )
+    )
+
+    def empty = XmasSequences(Map.empty[String, IndexedSeq[Int]])
+}
+
+case class Condition(field: String, test: Test, goto: Label, inverse: Boolean){
+    override def toString(): String = (if (inverse) "!" else "") + field + test.toString + ":" + goto.toString
 
     def pass(part: Part): Boolean = {
         val rating = part.ratings(field)
@@ -100,11 +122,14 @@ case class Condition(field: String, test: Test, goto: Label){
         }
     }
 
-    def filterRange(range: Range): Range = {
+    def filterSeq(seq: IndexedSeq[Int]): IndexedSeq[Int] = {
         test match {
-            case GreaterThan(x) => if (range.end <= x) Range(0,0) else Range(x, range.end)
-            case LessThan(x) => if (range.start >= x) Range(0,0) else Range(range.start, x)
-            case EqualTo(x) => if (range.contains(x)) Range(x, x) else Range(0,0)
+            case GreaterThan(x) if inverse => seq.filter(_ <= x)
+            case LessThan(x) if inverse => seq.filter(_ >= x)
+            case EqualTo(x) if inverse => seq.filter(_ != x)
+            case GreaterThan(x) => seq.filter(_ > x)
+            case LessThan(x) => seq.filter(_ < x)
+            case EqualTo(x) => seq.filter(_ == x)
         }
     }
 
@@ -124,27 +149,6 @@ case class Step(conditions: Array[Condition], next: Label) {
             case None => next
         }
         Part(part.ratings, label)
-    }
-
-    def processRange(xmas: XmasRange): Array[XmasRange] = {
-
-        if (allAccept) {
-            Array(xmas.copy(label = Accepted))
-        } else if (allReject) {
-            Array(xmas.copy(label = Rejected))
-        } else {
-
-            // process conditions against each range
-            for {
-                cond <- conditions
-                range = xmas.valid.getOrElse(cond.field, XmasRange.FULL_RANGE)
-                newRange = cond.filterRange(range)
-                if !(newRange.start == 0 && newRange.end == 0)
-                others = xmas.valid.filterKeys(_ != cond.field)
-            } yield {
-                XmasRange(others.toMap + (cond.field -> newRange), cond.goto)
-            }
-        }
     }
 
 }
@@ -172,23 +176,6 @@ case class Workflow(steps: Map[Label, Step]) {
         }
     }
 
-    def processRange(xmas: XmasRange): Array[XmasRange] = {
-        if (xmas.label == Accepted || xmas.label == Rejected) {
-            Array(xmas)
-        } else {
-            steps.get(xmas.label) match {
-                case Some(step) =>
-                    if (DEBUG) println("\nApplying " + step)
-                    val newRanges = step.processRange(xmas) :+ xmas.copy(label = step.next)
-                    if (DEBUG) newRanges.foreach(println)
-                    newRanges.flatMap(processRange)
-                case None => 
-                    println("No step found for label " + xmas.label)
-                Array(xmas)
-            }
-        }
-    }
-
     def allRoutes: Array[Array[Condition]] = {
 
         def allRoutes(condition: Condition): Array[Array[Condition]] = {
@@ -196,7 +183,7 @@ case class Workflow(steps: Map[Label, Step]) {
             steps.get(condition.goto) match {
                 case Some(step) =>
                     print("Step: " + step)
-                    val destinations = step.conditions :+ Condition("f", Default, step.next)
+                    val destinations = step.conditions ++ step.conditions.map(c => c.copy(inverse = true, goto = step.next))
                     println(destinations.mkString(" -> ",", ",""))
                     val routes = destinations.flatMap(allRoutes)
                     if (routes.length == 0) {
@@ -210,28 +197,27 @@ case class Workflow(steps: Map[Label, Step]) {
             }
         }
 
-        allRoutes(Condition("f", Default, IN))
+        allRoutes(Condition("f", Default, IN, false))
     }
 
-    def applyConditions(conditions: Array[Condition]): XmasRange = {
+    def applyConditions(conditions: Array[Condition]): XmasSequences = {
 
-        val startRange = XmasRange.full
+        val startSeqs = XmasSequences.full
 
-        val result = conditions.foldLeft(startRange)((acc, cond) => 
+        val result = conditions.foldLeft(startSeqs)((acc, cond) => 
 
             acc.valid.get(cond.field) match {
-                case Some(range) => 
-                    val newRange = cond.filterRange(range)
-                    if (newRange.start == 0 && newRange.end == 0) {
-                        XmasRange.empty
+                case Some(seq) => 
+                    val newSeq = cond.filterSeq(seq)
+                    if (newSeq.isEmpty) {
+                        XmasSequences.empty
                     } else {
-                        XmasRange(acc.valid.filterKeys(_ != cond.field).toMap + (cond.field -> newRange))
+                        XmasSequences(acc.valid.filterKeys(_ != cond.field).toMap + (cond.field -> newSeq))
                     }
                 case None => 
                     acc
             }
         )
-        println(result)
         result
     }
 
@@ -262,7 +248,7 @@ def parseFile(lines: List[String]): ParsedData = {
                 val conds = STEP_REGEX.findAllIn(conditions).map(c => 
                     c match {
                         case STEP_REGEX(field, cond, value, label) =>
-                            Condition(field, Test(cond, value.toInt), Label(label))
+                            Condition(field, Test(cond, value.toInt), Label(label), false)
                     }
                 ).toArray
                 Label(name) -> Step(conds, Label(next))
@@ -297,7 +283,7 @@ def part1(data: ParsedData): Unit = {
 
     println ("Accepted: " + accepted.length)
     println ("Total rating: " + accepted.map(_.totalRating).sum)
-
+    println()
 
 }
 
@@ -316,12 +302,6 @@ def part2(data: ParsedData): Unit = {
     val applied = accepted.map(data.workflow.applyConditions)
     println("\nApplied:")
     applied.foreach(println)
-
-    val combos = applied.map(_.combinations)
-    println("\nCombinations:")
-    combos.foreach(println)
-
-    println("\nTotal combinations: " + combos.sum)
 
 }
 
