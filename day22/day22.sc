@@ -5,7 +5,7 @@ import scala.util.matching.Regex
 val TEST = false
 val DEBUG = false
 
-val INPUTFILE = if (TEST) "day22\\test.txt" else "day22\\input.txt"
+val INPUTFILE = if (TEST) ".\\test.txt" else ".\\input.txt"
 
 val fileInput = Source.fromFile(INPUTFILE).getLines.toList
 
@@ -61,7 +61,7 @@ case class Brick(label: String, start: Voxel, end: Voxel) {
 
 case class Support(brick: Brick, supportedBy: List[Brick]) {
     
-    override def toString(): String = brick.toString + " supported by " + supportedBy.map(_.toString).mkString(", ")
+    override def toString(): String = brick.label + " supported by " + supportedBy.map(_.label).mkString(", ")
 }
 
 case class Scene(space: Space3D, bricks: List[Brick]) {
@@ -178,6 +178,8 @@ def parseFile(lines: List[String]): Scene = {
 
 }
 
+def labelList(bricks: List[Brick]): String = bricks.map(_.label).mkString(", ")
+
 def part1(scene: Scene): Unit = {
 
     println("Part 1")
@@ -192,12 +194,19 @@ def part1(scene: Scene): Unit = {
     droppedScene.drawXYView
 
     val multiSupport = support.filter(_.supportedBy.size > 1)
-    if (DEBUG) println(s"Bricks which have multiple supports: $multiSupport")
+    val multiSupporters = multiSupport.map(_.supportedBy).flatten.distinct.sortBy(_.label)
+    val notSupporting = droppedScene.bricks.filterNot(b => support.exists(s => s.supportedBy.contains(b))).sortBy(_.label)
 
+    println(s"\n${multiSupport.length} bricks have multiple supports:\n${multiSupport.mkString("\n")}")
+    println(s"\n${multiSupporters.length} bricks support a brick with more than one support:\n${labelList(multiSupporters)}")
+    println(s"\n${notSupporting.length} bricks are not supporting anything:\n")
+    notSupporting.foreach(println)
+
+    val removable = multiSupporters ++ notSupporting
+    
     println("Bricks which could be removed:")
-    val removable = multiSupport.map(_.supportedBy).flatten.distinct
-    removable.foreach(println)
-
+    println(labelList(removable))
+ 
     println(s"Number of removable bricks: ${removable.size}")
 
 }
@@ -223,3 +232,4 @@ println("End time: " + endTime)
 println("Elapsed time: " + java.time.Duration.between(startTime, endTime))
 
 
+// Part 1 : 
